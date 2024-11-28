@@ -2,15 +2,27 @@ import React, { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/router";
 
 export default function Holidays() {
+  const router = useRouter();
+  const [year, setYear] = useState();
+  const [province, setProvince] = useState();
+  const [searchQuery, setSearchQuery] = useState();
+  const [currentPage, setCurrentPage] = useState(1);
   const [holidays, setHolidays] = useState([]);
   const [filteredHolidays, setFilteredHolidays] = useState([]);
-  const [year, setYear] = useState(2024);
-  const [province, setProvince] = useState("All");
-  const [currentPage, setCurrentPage] = useState(1);
-  const [searchQuery, setSearchQuery] = useState("");
-  const router = useRouter();
 
   const holidaysPerPage = 10;
+  useEffect(() => {
+    if (router.isReady) {
+      const { year: queryYear, province: queryProvince, searchQuery: querySearch, page: queryPage } = router.query;
+      
+      setYear(queryYear || "2024");
+      setProvince(queryProvince || "All");
+      setSearchQuery(querySearch || "");
+      setCurrentPage(parseInt(queryPage, 10) || 1);
+
+      fetchHolidays(queryYear || "2024");
+    }
+  }, [router.isReady]);
 
   const fetchHolidays = async (selectedYear) => {
     const response = await fetch(`https://canada-holidays.ca/api/v1/holidays?year=${selectedYear}`);
@@ -19,13 +31,9 @@ export default function Holidays() {
   };
 
   useEffect(() => {
-    fetchHolidays(year);
-  }, [year]);
-
-  useEffect(() => {
     let filtered = holidays;
 
-    if (province !== "All") {
+    if (province && province !== "All") {
       filtered = filtered.filter(holiday => 
         holiday.federal || holiday.provinces.some(pr => pr.id === province)
       );
@@ -38,14 +46,16 @@ export default function Holidays() {
     }
 
     setFilteredHolidays(filtered);
-    setCurrentPage(1);
+    setCurrentPage(1); 
   }, [holidays, province, searchQuery]);
 
   useEffect(() => {
-    router.push({
-      pathname: "/",
-      query: { year, province, searchQuery, page: currentPage }
-    }, undefined, { shallow: true });
+    if (year && province && searchQuery !== undefined) {
+      router.push({
+        pathname: "/",
+        query: { year, province, searchQuery, page: currentPage }
+      }, undefined, { shallow: true });
+    }
   }, [year, province, searchQuery, currentPage]);
 
   const paginatedHolidays = useMemo(() => {
@@ -56,7 +66,6 @@ export default function Holidays() {
   return (
     <div>
       <h1>Holidays</h1>
-
       <label>Year:</label>
       <select id="year-filter" value={year} onChange={e => setYear(e.target.value)}>
         {[...Array(11)].map((_, i) => (
@@ -69,7 +78,7 @@ export default function Holidays() {
         <option value="All">All</option>
         <option value="ON">ON</option>
         <option value="QC">QC</option>
-        {/* Add other provinces here */}
+        {}
       </select>
 
       <input
@@ -86,7 +95,7 @@ export default function Holidays() {
             <th>Date</th>
             <th>Name</th>
             <th>Name (FR)</th>
-            <th>Provinces</th>
+            <th>Province(s)</th>
           </tr>
         </thead>
         <tbody>
@@ -100,7 +109,6 @@ export default function Holidays() {
           ))}
         </tbody>
       </table>
-
       <button
         id="prev-page"
         onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
@@ -118,3 +126,4 @@ export default function Holidays() {
     </div>
   );
 }
+
